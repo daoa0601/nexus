@@ -1,0 +1,55 @@
+{
+  "name": "unified-llm",
+  "version": "0.1.0",
+  "description": "Unified LLM gateway with speed-first routing across multiple providers",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --target node && bun run build:types",
+    "build:types": "tsc --emitDeclarationOnly --declaration --outDir dist",
+    "test": "bun test",
+    "dev": "bun --watch src/index.ts",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "llm",
+    "openai",
+    "anthropic",
+    "gemini",
+    "ollama",
+    "ai",
+    "gateway"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "openai": "^4.77.0",
+    "@anthropic-ai/sdk": "^0.36.3",
+    "@google/generative-ai": "^0.21.0",
+    "uuid": "^11.0.3"
+  },
+  "optionalDependencies": {
+    "node-llama-cpp": "^3.3.0",
+    "better-sqlite3": "^12.6.0",
+    "js-tiktoken": "^1.0.15",
+    "llama-tokenizer-js": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.9.3"
+  }
+}
