@@ -51,16 +51,19 @@ function normalizeModelName(model: string): string {
 
 /**
  * Find pricing for model with fallback
+ * Uses Object.hasOwn() to prevent prototype chain property access attacks
  */
 function findPricing(model: string, customPricing?: Record<string, Pricing>): Pricing | null {
   // Check custom pricing first (exact match)
-  if (customPricing?.[model]) {
-    return customPricing[model];
+  // Use Object.hasOwn to prevent prototype chain access (e.g., model="constructor")
+  if (customPricing && Object.hasOwn(customPricing, model)) {
+    return customPricing[model]!;
   }
 
   // Check default pricing (exact match)
-  if (DEFAULT_PRICING[model]) {
-    return DEFAULT_PRICING[model];
+  // Use Object.hasOwn to prevent prototype chain access
+  if (Object.hasOwn(DEFAULT_PRICING, model)) {
+    return DEFAULT_PRICING[model]!;
   }
 
   // Try normalized match
