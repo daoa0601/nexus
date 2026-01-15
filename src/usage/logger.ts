@@ -85,12 +85,18 @@ export class UsageLogger {
       const requestId = uuid();
       const timestamp = Date.now();
 
-      // Extract or estimate token counts
-      const inputTokens = response.usage?.promptTokens
-        ?? await this.countInputTokens(params, response.provider ?? 'unknown', response.model ?? 'unknown');
+      // Extract or estimate token counts (parallelized when both need estimation)
+      const provider = response.provider ?? 'unknown';
+      const model = response.model ?? 'unknown';
 
-      const outputTokens = response.usage?.completionTokens
-        ?? await this.countOutputTokens(response.content ?? '', response.provider ?? 'unknown', response.model ?? 'unknown');
+      const [inputTokens, outputTokens] = await Promise.all([
+        response.usage?.promptTokens !== undefined
+          ? Promise.resolve(response.usage.promptTokens)
+          : this.countInputTokens(params, provider, model),
+        response.usage?.completionTokens !== undefined
+          ? Promise.resolve(response.usage.completionTokens)
+          : this.countOutputTokens(response.content ?? '', provider, model),
+      ]);
 
       // Calculate cache tokens
       const cacheReadTokens = this.extractCacheTokens(response.usage, 'prompt' as const);

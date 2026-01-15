@@ -35,6 +35,9 @@ export class ProviderMetrics {
   private totalRequests: number = 0;
   private lastUpdated: number = Date.now();
 
+  // Incremental tracking to avoid O(n) filter operations
+  private successCount: number = 0;
+
   constructor(config: MetricsConfig = {}) {
     this.alpha = config.alpha ?? 0.3;
     this.ewmaLatency = config.initialLatency ?? 500;
@@ -69,11 +72,11 @@ export class ProviderMetrics {
 
   /**
    * Get the success rate (0-1) over the recent window
+   * Optimized: O(1) using incremental tracking instead of O(n) filter
    */
   getSuccessRate(): number {
     if (this.outcomes.length === 0) return 1; // Assume success if no data
-    const successes = this.outcomes.filter((o) => o).length;
-    return successes / this.outcomes.length;
+    return this.successCount / this.outcomes.length;
   }
 
   /**
@@ -85,9 +88,10 @@ export class ProviderMetrics {
 
   /**
    * Get count of recent failures (in current window)
+   * Optimized: O(1) using incremental tracking instead of O(n) filter
    */
   getRecentFailures(): number {
-    return this.outcomes.filter((o) => !o).length;
+    return this.outcomes.length - this.successCount;
   }
 
   /**
@@ -132,16 +136,25 @@ export class ProviderMetrics {
     this.ewmaLatency = initialLatency ?? 500;
     this.outcomes = [];
     this.totalRequests = 0;
+    this.successCount = 0;
     this.lastUpdated = Date.now();
   }
 
   private recordOutcome(success: boolean): void {
+    // Track evicted element before shifting
+    if (this.outcomes.length >= this.successWindow) {
+      const evicted = this.outcomes.shift();
+      if (evicted) {
+        this.successCount--;
+      }
+    }
+
     this.outcomes.push(success);
     this.totalRequests++;
 
-    // Keep only recent window
-    if (this.outcomes.length > this.successWindow) {
-      this.outcomes.shift();
+    // Update incremental success count
+    if (success) {
+      this.successCount++;
     }
   }
 }

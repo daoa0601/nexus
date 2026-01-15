@@ -17,6 +17,9 @@ export class MemoryCache implements CacheAdapter {
   private hits = 0;
   private misses = 0;
 
+  // Incremental size tracking to avoid O(n) iteration in stats()
+  private totalSize = 0;
+
   constructor(config: MemoryCacheConfig) {
     this.maxSize = config.maxSize;
     this.ttlMs = config.ttlMs;
@@ -33,6 +36,7 @@ export class MemoryCache implements CacheAdapter {
     // Check if expired
     if (Date.now() > entry.expiresAt) {
       this.cache.delete(key);
+      this.totalSize -= entry.response.length * 2; // UTF-16
       this.misses++;
       return null;
     }
@@ -46,10 +50,20 @@ export class MemoryCache implements CacheAdapter {
   }
 
   async set(key: string, response: string, model: string, provider: string): Promise<void> {
+    // If key already exists, subtract old size first
+    const existing = this.cache.get(key);
+    if (existing) {
+      this.totalSize -= existing.response.length * 2;
+    }
+
     // Evict oldest if at capacity
-    if (this.cache.size >= this.maxSize) {
+    if (this.cache.size >= this.maxSize && !existing) {
       const oldestKey = this.cache.keys().next().value;
       if (oldestKey) {
+        const oldEntry = this.cache.get(oldestKey);
+        if (oldEntry) {
+          this.totalSize -= oldEntry.response.length * 2;
+        }
         this.cache.delete(oldestKey);
       }
     }
@@ -65,9 +79,14 @@ export class MemoryCache implements CacheAdapter {
     };
 
     this.cache.set(key, entry);
+    this.totalSize += response.length * 2; // UTF-16
   }
 
   async delete(key: string): Promise<boolean> {
+    const entry = this.cache.get(key);
+    if (entry) {
+      this.totalSize -= entry.response.length * 2;
+    }
     return this.cache.delete(key);
   }
 
@@ -75,21 +94,17 @@ export class MemoryCache implements CacheAdapter {
     this.cache.clear();
     this.hits = 0;
     this.misses = 0;
+    this.totalSize = 0;
   }
 
   async stats(): Promise<{ entries: number; size: number; hitRate?: number }> {
-    // Estimate size (rough approximation)
-    let size = 0;
-    for (const entry of this.cache.values()) {
-      size += entry.response.length * 2; // UTF-16
-    }
-
+    // Use incrementally tracked size (O(1) instead of O(n))
     const total = this.hits + this.misses;
     const hitRate = total > 0 ? this.hits / total : undefined;
 
     return {
       entries: this.cache.size,
-      size,
+      size: this.totalSize,
       hitRate,
     };
   }
@@ -103,6 +118,7 @@ export class MemoryCache implements CacheAdapter {
 
     for (const [key, entry] of this.cache) {
       if (now > entry.expiresAt) {
+        this.totalSize -= entry.response.length * 2;
         this.cache.delete(key);
         pruned++;
       }

@@ -198,8 +198,11 @@ export class RacingExecutor {
    * Race all entries with global timeout
    */
   private async raceWithTimeout(entries: RaceEntry[]): Promise<RacingResult> {
+    // Track timeout for cleanup
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         reject(new Error(`Global timeout exceeded (${this.globalTimeout}ms)`));
       }, this.globalTimeout);
     });
@@ -215,7 +218,14 @@ export class RacingExecutor {
       } satisfies RacingResult;
     });
 
-    return Promise.race([...racingPromises, timeoutPromise]);
+    try {
+      return await Promise.race([...racingPromises, timeoutPromise]);
+    } finally {
+      // Always clear timeout to prevent memory leak
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+    }
   }
 
   /**

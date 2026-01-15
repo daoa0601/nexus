@@ -247,14 +247,18 @@ export class UsageTracker {
 
   /**
    * Generate comprehensive usage report
+   * Optimized: Parallelizes independent database queries
    */
   async getReport(options?: {
     startDate?: Date;
     endDate?: Date;
     groupBy?: 'provider' | 'model' | 'day';
   }): Promise<UsageReport> {
-    const byProvider = await this.getUsageByProvider(options?.startDate, options?.endDate);
-    const byModel = await this.getUsageByModel(undefined, options?.startDate, options?.endDate);
+    // Run independent queries in parallel instead of sequentially
+    const [byProvider, byModel] = await Promise.all([
+      this.getUsageByProvider(options?.startDate, options?.endDate),
+      this.getUsageByModel(undefined, options?.startDate, options?.endDate),
+    ]);
 
     const totalCost = Object.values(byProvider).reduce((sum, p) => sum + p.cost, 0);
     const totalTokens = Object.values(byProvider).reduce((sum, p) => sum + p.tokens, 0);

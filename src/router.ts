@@ -375,19 +375,25 @@ export class Router {
 
   /**
    * Order providers by speed tier
+   * Optimized: Uses Set for O(1) lookups instead of O(n) Array.includes()
    */
   private orderByTier(providers: string[]): string[] {
+    // Use Set for O(1) lookups instead of O(n) Array.includes()
+    const providerSet = new Set(providers);
+    const orderedSet = new Set<string>();
     const ordered: string[] = [];
 
+    // Order by tier priority
     for (const tier of this.speedTiers) {
-      if (providers.includes(tier.provider) && !ordered.includes(tier.provider)) {
+      if (providerSet.has(tier.provider) && !orderedSet.has(tier.provider)) {
         ordered.push(tier.provider);
+        orderedSet.add(tier.provider);
       }
     }
 
     // Add any remaining providers not in tiers
     for (const provider of providers) {
-      if (!ordered.includes(provider)) {
+      if (!orderedSet.has(provider)) {
         ordered.push(provider);
       }
     }
@@ -397,21 +403,34 @@ export class Router {
 
   /**
    * Refine order based on health scores (EWMA latency + success rate)
+   * Optimized: Precomputes scores to avoid repeated calculation in sort
    */
   private refineByHealth(providers: string[]): string[] {
-    // Need some data before health-based reordering
-    const providersWithData = providers.filter((p) => this.metrics.hasReliableData(p));
+    if (providers.length < 2) {
+      return providers;
+    }
 
-    if (providersWithData.length < 2) {
+    // Check if we have enough data for meaningful reordering (O(n) instead of filter)
+    let reliableCount = 0;
+    for (const p of providers) {
+      if (this.metrics.hasReliableData(p)) {
+        reliableCount++;
+        if (reliableCount >= 2) break; // Early exit once we know we have enough
+      }
+    }
+
+    if (reliableCount < 2) {
       return providers; // Not enough data for meaningful reordering
     }
 
-    // Sort by health score (higher is better)
-    return [...providers].sort((a, b) => {
-      const aScore = this.metrics.getMetrics(a).getHealthScore();
-      const bScore = this.metrics.getMetrics(b).getHealthScore();
-      return bScore - aScore; // Descending (higher score first)
-    });
+    // Precompute health scores once to avoid repeated calculation in sort
+    const scores = new Map<string, number>();
+    for (const p of providers) {
+      scores.set(p, this.metrics.getMetrics(p).getHealthScore());
+    }
+
+    // Sort by precomputed health score (higher is better)
+    return [...providers].sort((a, b) => scores.get(b)! - scores.get(a)!);
   }
 
   /**

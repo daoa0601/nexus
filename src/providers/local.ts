@@ -49,6 +49,10 @@ export class LocalProvider extends LLMProvider {
   // Performance: O(1) model lookup via HashMap
   private modelIndex: Map<string, string> = new Map(); // normalized name → filename
 
+  // Performance: Cache model list to avoid rebuilding index on every call
+  private cachedModels: string[] | null = null;
+  private modelIndexValid = false;
+
   // Performance: Context pool for VRAM reuse
   private contextPool: ContextPool<LlamaContext>;
 
@@ -128,23 +132,39 @@ export class LocalProvider extends LLMProvider {
         return [];
       }
 
-      const files = readdirSync(this.config.modelsPath);
-      const ggufFiles = files.filter((f) => f.endsWith('.gguf'));
+      // Return cached result if available
+      if (this.modelIndexValid && this.cachedModels !== null) {
+        return this.cachedModels;
+      }
 
-      // Build model index for O(1) lookup
+      const files = readdirSync(this.config.modelsPath);
+      const ggufFiles = files.filter((f: string) => f.endsWith('.gguf'));
+
+      // Build model index for O(1) lookup (only when invalidated)
       this.buildModelIndex(ggufFiles);
+      this.modelIndexValid = true;
 
       // If specific models configured, filter to those
       if (this.config.models?.length) {
-        return ggufFiles.filter((f) =>
+        this.cachedModels = ggufFiles.filter((f: string) =>
           this.config.models!.some((m) => f.toLowerCase().includes(m.toLowerCase()))
         );
+      } else {
+        this.cachedModels = ggufFiles;
       }
 
-      return ggufFiles;
+      return this.cachedModels!;
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Invalidate model cache (call when models directory changes)
+   */
+  invalidateModelCache(): void {
+    this.modelIndexValid = false;
+    this.cachedModels = null;
   }
 
   /**
@@ -378,5 +398,8 @@ export class LocalProvider extends LLMProvider {
     }
     this.loadedModels.clear();
     this.modelIndex.clear();
+
+    // Clear model cache
+    this.invalidateModelCache();
   }
 }

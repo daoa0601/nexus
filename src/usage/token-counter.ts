@@ -162,24 +162,31 @@ export class TokenCounter {
 
   /**
    * Count tokens from messages array
+   * Optimized: Batches all content into a single tokenization call
    */
   async countMessages(
     messages: Message[],
     provider: string,
     model: string
   ): Promise<number> {
-    let total = 0;
-
-    for (const message of messages) {
-      // Count content
-      total += await this.count(message.content, provider, model);
-
-      // Add overhead for role markers and special tokens
-      // Approximate: ~4 tokens per message for formatting
-      total += 4;
+    if (messages.length === 0) {
+      return 0;
     }
 
-    return total;
+    // Batch all content together for single tokenization (avoids N+1 pattern)
+    // Use a separator that's unlikely to be in the content
+    const separator = '\n<|msg|>\n';
+    const batchedContent = messages.map(m => m.content).join(separator);
+
+    // Count tokens in batched content
+    const contentTokens = await this.count(batchedContent, provider, model);
+
+    // Subtract approximate tokens for separators (roughly 3-4 tokens each)
+    // and add back message formatting overhead (~4 tokens per message)
+    const separatorTokens = (messages.length - 1) * 4;
+    const messageOverhead = messages.length * 4;
+
+    return Math.max(0, contentTokens - separatorTokens + messageOverhead);
   }
 
   /**
