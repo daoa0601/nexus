@@ -1,0 +1,41 @@
+version: 1
+
+server:
+  host: 127.0.0.1
+  port: 8787
+  requestTimeoutMs: 30000
+  bodyLimitBytes: 1048576
+  maxMessages: 128
+  maxContentChars: 200000
+  maxOutputTokens: 16384
+  maxConcurrentRequests: 64
+  shutdownGraceMs: 5000
+
+auth:
+  tokens:
+    - id: local-client
+      tenantId: local
+      secretEnv: NEXUS_CLIENT_TOKEN
+
+tenants:
+  - id: local
+    allowedModels:
+      - general-chat
+
+providers:
+  - id: openai
+    type: openai-compatible
+    baseUrl: https://api.openai.com/v1
+    apiKeyEnv: OPENAI_API_KEY
+    allowLoopbackHttp: false
+    requestTimeoutMs: 20000
+    maxConcurrency: 16
+
+models:
+  - alias: general-chat
+    equivalentTargets: false
+    targets:
+      - providerId: openai
+        model: gpt-4.1-mini
+    routing:
+      mode: fallback

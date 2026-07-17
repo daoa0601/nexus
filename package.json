@@ -1,0 +1,80 @@
+{
+  "name": "llm-nexus",
+  "version": "0.1.0",
+  "description": "Authenticated OpenAI-compatible transport gateway and reusable core",
+  "type": "module",
+  "packageManager": "pnpm@11.13.1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/daoa0601/llm-nexus.git"
+  },
+  "homepage": "https://github.com/daoa0601/llm-nexus#readme",
+  "bugs": "https://github.com/daoa0601/llm-nexus/issues",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "nexus": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "ARCHITECTURE.md",
+    "QUALITY.md",
+    "SECURITY.md",
+    "LICENSE",
+    "examples/nexus.example.yaml",
+    "scripts/quality/require-pnpm.mjs"
+  ],
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0",
+    "pnpm": "11.13.1"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node --input-type=module -e \"import { chmodSync } from 'node:fs'; chmodSync('dist/cli.js', 0o755)\"",
+    "check": "pnpm quality:quick && pnpm test",
+    "deps:audit": "pnpm audit --prod --audit-level high",
+    "deps:check": "pnpm deps:audit && pnpm deps:signatures",
+    "deps:signatures": "pnpm audit signatures",
+    "dev": "pnpm build && node --enable-source-maps dist/cli.js",
+    "format": "prettier --write . --ignore-unknown",
+    "format:check": "prettier --check . --ignore-unknown",
+    "hooks:install": "node scripts/quality/install-hooks.mjs",
+    "lint": "oxlint src tests scripts vitest.config.ts --deny-warnings",
+    "pack:check": "node scripts/quality/check-pack.mjs",
+    "preflight": "pnpm quality",
+    "preinstall": "node scripts/quality/require-pnpm.mjs",
+    "quality": "pnpm quality:offline && pnpm deps:check",
+    "quality:offline": "pnpm quality:quick && pnpm test:coverage && pnpm build && pnpm pack:check",
+    "quality:quick": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm secrets:scan",
+    "secrets:scan": "node scripts/quality/scan-secrets.mjs",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "keywords": [
+    "llm",
+    "openai-compatible",
+    "gateway",
+    "effect",
+    "sse"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "effect": "4.0.0-beta.98",
+    "yaml": "2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.11",
+    "@vitest/coverage-v8": "4.1.10",
+    "oxlint": "1.74.0",
+    "prettier": "3.9.5",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}
