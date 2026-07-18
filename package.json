@@ -1,6 +1,6 @@
 {
   "name": "llm-nexus",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Authenticated OpenAI-compatible transport gateway and reusable core",
   "type": "module",
@@ -8,10 +8,10 @@
   "prettier": "@agentic-orch/ts-quality/prettier",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/daoa0601/llm-nexus.git"
+    "url": "git+https://github.com/daoa0601/nexus.git"
   },
-  "homepage": "https://github.com/daoa0601/llm-nexus#readme",
-  "bugs": "https://github.com/daoa0601/llm-nexus/issues",
+  "homepage": "https://github.com/daoa0601/nexus#readme",
+  "bugs": "https://github.com/daoa0601/nexus/issues",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
