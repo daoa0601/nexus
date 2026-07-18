@@ -24,9 +24,9 @@ development dependency is not available yet when a clean install enters `preinst
 floors, Nexus's additional compiler flags, build behavior, and dependency policy remain owned by
 this repository.
 
-The expanded GitHub Actions jobs remain checked in as future automation structure. They cannot run
-from a Nexus checkout alone while the private workspace modules have no immutable Git source; the
-coordinated local checkout and the commands below are the current validation source of truth.
+The checked-in GitHub Actions jobs recreate the sibling layout by checking out both workspace
+modules at audited full commit SHAs. Local development uses the coordinated sibling checkout; both
+paths retain frozen installs without a registry fallback.
 
 ## Local module status
 
