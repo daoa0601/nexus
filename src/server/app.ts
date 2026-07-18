@@ -2,6 +2,12 @@ import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 
+import {
+  HttpGuardrailError,
+  readBoundedJson,
+  sendJson as sendHardenedJson,
+} from "@agentic-orch/node-guardrails/http";
+
 import type { LoadedConfig } from "../config/load.js";
 import { ConcurrencyGate, type Release } from "../core/concurrency.js";
 import { createNexusGateway, NexusGateway } from "../core/gateway.js";
@@ -41,61 +47,40 @@ const sendJson = (
   requestId: string,
   extraHeaders: Readonly<Record<string, string>> = {},
 ): void => {
-  if (response.headersSent || response.destroyed) return;
-  setCommonHeaders(response, requestId);
-  response.statusCode = status;
-  response.setHeader("content-type", "application/json; charset=utf-8");
-  for (const [name, value] of Object.entries(extraHeaders)) response.setHeader(name, value);
-  response.end(JSON.stringify(body));
+  sendHardenedJson(response, status, body, {
+    headers: { ...extraHeaders, "x-request-id": requestId },
+  });
 };
 
 const readJsonBody = async (
   request: IncomingMessage,
+  response: ServerResponse,
   byteLimit: number,
   signal: AbortSignal,
+  rejectionTimeoutMs: number,
 ): Promise<unknown> => {
-  const contentType = request.headers["content-type"]?.split(";", 1)[0]?.trim().toLowerCase();
-  if (contentType !== "application/json") {
-    throw new NexusError("INVALID_REQUEST", "Content-Type must be application/json");
-  }
-  const contentLength = request.headers["content-length"];
-  if (contentLength !== undefined) {
-    const parsed = Number(contentLength);
-    if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > byteLimit) {
+  try {
+    return await readBoundedJson(request, {
+      limitBytes: byteLimit,
+      signal,
+      rejection: {
+        action: "respond-and-close",
+        response,
+        timeoutMs: Math.max(1, rejectionTimeoutMs),
+      },
+    });
+  } catch (cause) {
+    if (cause instanceof HttpGuardrailError) {
+      if (cause.kind === "aborted" && signal.aborted) throw signal.reason;
       throw new NexusError(
         "INVALID_REQUEST",
-        `Request body exceeds the configured limit of ${byteLimit} bytes`,
+        cause.kind === "body_too_large"
+          ? `Request body exceeds the configured limit of ${byteLimit} bytes`
+          : cause.message,
+        { cause },
       );
     }
-  }
-  const chunks: Buffer[] = [];
-  let total = 0;
-  const onAbort = (): void => {
-    request.destroy(signal.reason instanceof Error ? signal.reason : new ClientDisconnectReason());
-  };
-  if (signal.aborted) onAbort();
-  else signal.addEventListener("abort", onAbort, { once: true });
-  try {
-    for await (const chunk of request) {
-      if (signal.aborted) throw signal.reason;
-      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      total += buffer.byteLength;
-      if (total > byteLimit) {
-        throw new NexusError(
-          "INVALID_REQUEST",
-          `Request body exceeds the configured limit of ${byteLimit} bytes`,
-        );
-      }
-      chunks.push(buffer);
-    }
-  } finally {
-    signal.removeEventListener("abort", onAbort);
-  }
-  if (signal.aborted) throw signal.reason;
-  try {
-    return JSON.parse(Buffer.concat(chunks, total).toString("utf8"));
-  } catch {
-    throw new NexusError("INVALID_REQUEST", "Request body must contain valid JSON");
+    throw cause;
   }
 };
 
@@ -225,7 +210,9 @@ export class NexusServer {
     this.#server = createServer((request, response) => {
       void this.#dispatch(request, response);
     });
-    this.#server.requestTimeout = 0;
+    // Keep Node's parser-level incomplete-request watchdog as a second line of defense. The
+    // per-dispatch AbortController below also bounds routing and upstream work after headers land.
+    this.#server.requestTimeout = this.config.server.requestTimeoutMs;
     this.#server.headersTimeout = Math.min(this.config.server.requestTimeoutMs, 60_000);
     this.#server.keepAliveTimeout = 5_000;
   }
@@ -369,7 +356,13 @@ export class NexusServer {
     if (request.method === "POST" && path === "/v1/chat/completions") {
       if (tenant === undefined)
         throw new NexusError("INTERNAL_ERROR", "Authentication context is missing");
-      const body = await readJsonBody(request, this.config.server.bodyLimitBytes, signal);
+      const body = await readJsonBody(
+        request,
+        response,
+        this.config.server.bodyLimitBytes,
+        signal,
+        deadline - Date.now(),
+      );
       const chatRequest = decodeChatRequest(body, this.config.server);
       this.gateway.model(chatRequest.model);
       this.#authenticator.authorizeModel(tenant, chatRequest.model);

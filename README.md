@@ -9,9 +9,30 @@ prompts, evaluate candidates, or manage harness budgets.
 
 ## Credentials and the orchestration boundary
 
-Aiur and Templar use the ChatGPT-backed Codex CLI through the user's local Codex authentication.
+Agent Blocks and Templar use the ChatGPT-backed Codex CLI through the user's local Codex authentication.
 Nexus upstreams use provider API credentials referenced by environment-variable name in the Nexus
 configuration. A ChatGPT subscription is not copied into Nexus and is not an OpenAI API credential.
+
+A future Vercel target would add a separate credential boundary. Callers would continue to present
+their Nexus tenant bearer; Nexus would replace it with a Vercel AI Gateway API key or OIDC token for
+the outbound request. Vercel would then use either its managed provider credentials or provider BYOK
+credentials configured for that team or request. Those provider credentials are not the Nexus
+caller bearer and are not the AI Gateway credential.
+
+## Managed gateway boundary
+
+A hosted catalog gateway such as Vercel AI Gateway may eventually be configured as one Nexus
+upstream: Nexus would retain inbound authentication, public aliases, request validation, local or
+private targets, and deterministic policy, while the hosted gateway would own routing within its
+managed provider catalog. No such integration ships today. In particular, do not stack Nexus
+fallback or hedging around a managed gateway that already performs provider retries and fallbacks.
+Such an alias must start exactly one Nexus target attempt for one logical request. A later caller
+resubmission is a new logical request and can create new billable work; it is not another attempt of
+the first request.
+
+See [`MANAGED_GATEWAYS.md`](./MANAGED_GATEWAYS.md) for the build-versus-buy boundary, production and
+benchmark profiles, attempt-ledger semantics, AgentTrace correlation plan, security review, and
+current official Vercel references.
 
 ## Run the gateway
 
@@ -70,7 +91,13 @@ pnpm preflight
 See [QUALITY.md](QUALITY.md) for the pinned pnpm, coverage, dependency, package, secret, and local-hook
 gates.
 
+The current manifest uses `workspace:*` for `@agentic-orch/node-guardrails` and
+`@agentic-orch/ts-quality`; the lock resolves their sibling source trees. A frozen install therefore
+requires those siblings and cannot fall back to registry packages. This is the intended local
+topology.
+
 Tests use fake adapters and loopback fixture servers; they do not call billable provider APIs.
 
-See [`ARCHITECTURE.md`](./ARCHITECTURE.md) and [`SECURITY.md`](./SECURITY.md) for the service boundary,
-cancellation, telemetry, and security contracts.
+See [`ARCHITECTURE.md`](./ARCHITECTURE.md), [`SECURITY.md`](./SECURITY.md), and
+[`MANAGED_GATEWAYS.md`](./MANAGED_GATEWAYS.md) for the service boundary, cancellation, telemetry,
+managed-gateway, and security contracts.

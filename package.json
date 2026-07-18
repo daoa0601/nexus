@@ -1,9 +1,11 @@
 {
   "name": "llm-nexus",
   "version": "0.1.0",
+  "private": true,
   "description": "Authenticated OpenAI-compatible transport gateway and reusable core",
   "type": "module",
   "packageManager": "pnpm@11.13.1",
+  "prettier": "@agentic-orch/ts-quality/prettier",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/daoa0601/llm-nexus.git"
@@ -25,6 +27,7 @@
     "dist",
     "README.md",
     "ARCHITECTURE.md",
+    "MANAGED_GATEWAYS.md",
     "QUALITY.md",
     "SECURITY.md",
     "LICENSE",
@@ -44,15 +47,15 @@
     "dev": "pnpm build && node --enable-source-maps dist/cli.js",
     "format": "prettier --write . --ignore-unknown",
     "format:check": "prettier --check . --ignore-unknown",
-    "hooks:install": "node scripts/quality/install-hooks.mjs",
+    "hooks:install": "ts-quality hooks",
     "lint": "oxlint src tests scripts vitest.config.ts --deny-warnings",
-    "pack:check": "node scripts/quality/check-pack.mjs",
+    "pack:check": "ts-quality pack",
     "preflight": "pnpm quality",
     "preinstall": "node scripts/quality/require-pnpm.mjs",
     "quality": "pnpm quality:offline && pnpm deps:check",
     "quality:offline": "pnpm quality:quick && pnpm test:coverage && pnpm build && pnpm pack:check",
     "quality:quick": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm secrets:scan",
-    "secrets:scan": "node scripts/quality/scan-secrets.mjs",
+    "secrets:scan": "ts-quality secrets",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -66,10 +69,12 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@agentic-orch/node-guardrails": "workspace:*",
     "effect": "4.0.0-beta.98",
     "yaml": "2.9.0"
   },
   "devDependencies": {
+    "@agentic-orch/ts-quality": "workspace:*",
     "@types/node": "22.19.11",
     "@vitest/coverage-v8": "4.1.10",
     "oxlint": "1.74.0",
