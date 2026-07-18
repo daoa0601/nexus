@@ -22,5 +22,35 @@ concrete models, provider, latency, terminal outcome, classified failure, and au
 present. Prompt and response content are not ledger fields. `close()` stops admission, aborts active
 root scopes, closes listener connections within the configured grace period, and closes adapters.
 
-Nexus remains below Aiur. It performs transport policy only; orchestration, candidate selection,
+Nexus remains below Agent Blocks. It performs transport policy only; orchestration, candidate selection,
 worktrees, evaluation, persistence, and budgets belong to the orchestrator.
+
+The server imports bounded request-body, strict JSON, and hardened JSON-response mechanics from
+`@agentic-orch/node-guardrails/http`. Tenant credential lookup, hashed multi-tenant authentication, route
+policy, streaming, deadlines, and error redaction remain Nexus-owned. Repository quality mechanics
+come from exact-pinned `@agentic-orch/ts-quality`; neither shared package owns gateway policy.
+
+## Managed catalog gateways
+
+A managed catalog gateway is a possible upstream, not a replacement for Nexus's inbound boundary.
+In that profile, Nexus keeps tenant authentication, allowlists, stable aliases, validation,
+deadlines, cancellation, and its redacted dispatch ledger. The managed gateway owns selection and
+fallback among providers in its catalog. Local, private, unsupported, offline, or explicitly
+versioned deterministic routes remain direct Nexus targets.
+
+Only one layer may own fan-out. A managed-gateway alias should resolve to one Nexus target and must
+start exactly one target attempt: it must not use Nexus fallback or hedging. Otherwise one logical
+request can multiply across Nexus and the managed gateway. The Nexus ledger records the one dispatch
+to that target. Provider attempts hidden behind the target are separate nested facts and must not be
+presented as Nexus attempts. A later caller resubmission receives a new request identity and is new
+potentially billable work, not another target attempt of the original request.
+
+The caller authenticates to Nexus, Nexus authenticates to the managed gateway, and the managed
+gateway authenticates to its selected provider. The second credential is a Vercel AI Gateway API key
+or OIDC token; the third may be a Vercel-managed provider credential or provider BYOK. They are
+different secrets with different authorities and must not be conflated or forwarded across layers.
+
+No managed-gateway adapter or AgentTrace exporter exists today. Any future adapter must pass the
+same contract, cancellation, error-redaction, streaming, and bounded-response tests as a direct
+provider, and should preserve documented resolved-provider metadata for correlation. See
+[`MANAGED_GATEWAYS.md`](./MANAGED_GATEWAYS.md) for the full decision and operating profiles.

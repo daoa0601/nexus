@@ -12,6 +12,28 @@ pnpm hooks:install
 
 Use a supported Node.js release from `package.json`. CI and clean-room verification must always use `pnpm install --frozen-lockfile`.
 
+## Shared TypeScript policy
+
+Nexus consumes the exact-pinned `@agentic-orch/ts-quality` development package for the repository secret
+scan, package-manifest validation, managed Git-hook templates, strict Node.js TypeScript baseline,
+and Prettier defaults. The repository-level commands below remain stable; their shared mechanics
+delegate to `ts-quality` so fixes land once and are inherited on the next reviewed package update.
+
+The small `scripts/quality/require-pnpm.mjs` preinstall guard remains local by design: an external
+development dependency is not available yet when a clean install enters `preinstall`. Coverage
+floors, Nexus's additional compiler flags, build behavior, and dependency policy remain owned by
+this repository.
+
+The expanded GitHub Actions jobs remain checked in as future automation structure. They cannot run
+from a Nexus checkout alone while the private workspace modules have no immutable Git source; the
+coordinated local checkout and the commands below are the current validation source of truth.
+
+## Local module status
+
+`package.json` declares both local modules with `workspace:*`, and the lock resolves them from sibling
+directories. A frozen Nexus install requires `../node-guardrails` and `../ts-quality`; that explicit
+failure mode is intentional and prevents a registry fallback.
+
 ## Gate ladder
 
 | Command                | Purpose                                                                                                   |
@@ -24,7 +46,8 @@ Use a supported Node.js release from `package.json`. CI and clean-room verificat
 
 Coverage is measured over all `src/**/*.ts` files, including currently untested entrypoints. The enforced global floor is 75% statements, 60% branches, 80% functions, and 75% lines. Raising a floor is welcome; lowering one requires an explicit rationale.
 
-`pnpm hooks:install` configures this checkout to use the committed hooks:
+`pnpm hooks:install` installs the package-owned managed hooks into this checkout's active Git hooks
+directory:
 
 - pre-commit runs `pnpm quality:quick`;
 - pre-push runs `pnpm quality:offline`.
@@ -43,8 +66,15 @@ The hooks are a fast local feedback layer, not the source of truth. Automation s
 - explicit review of every dependency lifecycle script;
 - dependency-state verification before scripts run.
 
+`minimumReleaseAge: 1440` continues to protect newly released third-party dependencies. It does not
+apply to local `workspace:*` modules.
+
 Only `esbuild` is approved to execute a third-party install script. Optional native acceleration from `msgpackr-extract` is explicitly denied. Any new lifecycle script makes installation fail until it is reviewed and recorded in `allowBuilds`.
 
 ## Secret scan scope
 
-The local scanner examines tracked and unignored files for secret-bearing filenames, private keys, common provider token formats, and non-placeholder secret assignments in configuration files. It reports only file and line metadata, never the matched value. This supplements host and repository secret-scanning controls; it does not replace them.
+The shared scanner examines staged Git blobs, their current working-tree copies, and unignored
+untracked files for secret-bearing filenames, private keys, common provider token formats, and
+non-placeholder secret assignments in configuration files. It never follows symlinks, bounds file
+reads, and reports only escaped file and line metadata—never the matched value. This supplements
+host and repository secret-scanning controls; it does not replace them.

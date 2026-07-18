@@ -1,4 +1,5 @@
 import { request as makeHttpRequest } from "node:http";
+import { connect } from "node:net";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -52,6 +53,35 @@ const serverUrl = (server: NexusServer): string => {
   if (server.url === undefined) throw new Error("Test server did not expose an address");
   return server.url;
 };
+
+const rawHttpExchange = (server: NexusServer, payload: string): Promise<string> =>
+  new Promise<string>((resolve, reject) => {
+    const address = server.address;
+    if (address === undefined) {
+      reject(new Error("Test server did not expose an address"));
+      return;
+    }
+    const socket = connect({ host: "127.0.0.1", port: address.port });
+    let response = "";
+    let settled = false;
+    const timer = setTimeout(() => {
+      socket.destroy();
+      if (!settled) reject(new Error("Raw HTTP exchange did not close"));
+    }, 1_000);
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(response);
+    };
+    socket.setEncoding("utf8");
+    socket.on("data", (chunk: string) => {
+      response += chunk;
+    });
+    socket.once("error", reject);
+    socket.once("close", finish);
+    socket.once("connect", () => socket.end(payload));
+  });
 
 const postChat = (
   server: NexusServer,
@@ -421,6 +451,55 @@ describe("Nexus HTTP server", () => {
 
     expect(Date.now() - startedAt).toBeLessThan(400);
     expect(server.ledger.snapshot()).toEqual([]);
+    const closeStartedAt = Date.now();
+    await server.close();
+    expect(Date.now() - closeStartedAt).toBeLessThan(300);
+  });
+
+  it("rejects stacked transfer codings but accepts ordinary chunked JSON", async () => {
+    const server = await startServer(new FakeAdapter("fixture"));
+    const chatBody = JSON.stringify({
+      model: "public-chat",
+      messages: [{ role: "user", content: "hello" }],
+    });
+    const headers = [
+      "POST /v1/chat/completions HTTP/1.1",
+      "Host: nexus.local",
+      "Authorization: Bearer test-bearer-token",
+      "Content-Type: application/json",
+      "Connection: close",
+    ];
+    const unsupported = await rawHttpExchange(
+      server,
+      [
+        ...headers,
+        "Transfer-Encoding: gzip, chunked",
+        "",
+        chatBody.length.toString(16),
+        chatBody,
+        "0",
+        "",
+        "",
+      ].join("\r\n"),
+    );
+    expect(unsupported).toMatch(/^HTTP\/1\.1 400/u);
+    expect(unsupported).toContain("INVALID_REQUEST");
+
+    const chunked = await rawHttpExchange(
+      server,
+      [
+        ...headers,
+        "Transfer-Encoding: chunked",
+        "",
+        chatBody.length.toString(16),
+        chatBody,
+        "0",
+        "",
+        "",
+      ].join("\r\n"),
+    );
+    expect(chunked).toMatch(/^HTTP\/1\.1 200/u);
+    expect(chunked).toContain("chat.completion");
   });
 
   it("returns stable request IDs and redacted errors for malformed request IDs", async () => {

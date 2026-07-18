@@ -7,6 +7,9 @@ settings:
 importers:
   .:
     dependencies:
+      "@agentic-orch/node-guardrails":
+        specifier: workspace:*
+        version: link:../node-guardrails
       effect:
         specifier: 4.0.0-beta.98
         version: 4.0.0-beta.98
@@ -14,6 +17,9 @@ importers:
         specifier: 2.9.0
         version: 2.9.0
     devDependencies:
+      "@agentic-orch/ts-quality":
+        specifier: workspace:*
+        version: link:../ts-quality
       "@types/node":
         specifier: 22.19.11
         version: 22.19.11
