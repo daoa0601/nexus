@@ -7,32 +7,20 @@ operator has explicitly declared equivalent.
 Nexus is not an agent runtime. It does not run shell commands, invoke agentic CLIs, construct helper
 prompts, evaluate candidates, or manage harness budgets.
 
-## Credentials and the orchestration boundary
+## Credentials
 
-Agent Blocks and Templar use the ChatGPT-backed Codex CLI through the user's local Codex authentication.
 Nexus upstreams use provider API credentials referenced by environment-variable name in the Nexus
-configuration. A ChatGPT subscription is not copied into Nexus and is not an OpenAI API credential.
-
-A future Vercel target would add a separate credential boundary. Callers would continue to present
-their Nexus tenant bearer; Nexus would replace it with a Vercel AI Gateway API key or OIDC token for
-the outbound request. Vercel would then use either its managed provider credentials or provider BYOK
-credentials configured for that team or request. Those provider credentials are not the Nexus
-caller bearer and are not the AI Gateway credential.
+configuration. A ChatGPT subscription is not an OpenAI API credential and is never copied into Nexus.
+Callers authenticate with a Nexus tenant bearer, which is never forwarded upstream.
 
 ## Managed gateway boundary
 
 A hosted catalog gateway such as Vercel AI Gateway may eventually be configured as one Nexus
-upstream: Nexus would retain inbound authentication, public aliases, request validation, local or
-private targets, and deterministic policy, while the hosted gateway would own routing within its
-managed provider catalog. No such integration ships today. In particular, do not stack Nexus
-fallback or hedging around a managed gateway that already performs provider retries and fallbacks.
-Such an alias must start exactly one Nexus target attempt for one logical request. A later caller
-resubmission is a new logical request and can create new billable work; it is not another attempt of
-the first request.
-
-See [`MANAGED_GATEWAYS.md`](./MANAGED_GATEWAYS.md) for the build-versus-buy boundary, production and
-benchmark profiles, attempt-ledger semantics, AgentTrace correlation plan, security review, and
-current official Vercel references.
+upstream. No such integration ships today. Such an alias must resolve to exactly one Nexus target
+with no Nexus fallback or hedging, so one logical request starts exactly one Nexus target attempt.
+See [`MANAGED_GATEWAYS.md`](./MANAGED_GATEWAYS.md) for the configuration rules, operating profiles,
+attempt-ledger semantics, credential chain, and official Vercel references. Which layer owns
+retries and fallback across the other repositories is set in the catalog README.
 
 ## Run the gateway
 
@@ -46,7 +34,7 @@ pnpm build
 node ./dist/cli.js --config ./examples/nexus.example.yaml
 ```
 
-The installed package exposes the equivalent CLI:
+The package `bin` exposes the same CLI as `nexus`:
 
 ```bash
 nexus --config ./nexus.yaml
@@ -88,13 +76,13 @@ pnpm build
 pnpm preflight
 ```
 
-See [QUALITY.md](QUALITY.md) for the pinned pnpm, coverage, dependency, package, secret, and local-hook
+See [QUALITY.md](QUALITY.md) for the pinned pnpm, coverage, dependency, secret, and local-hook
 gates.
 
-The current manifest uses `workspace:*` for `@agentic-orch/node-guardrails` and
-`@agentic-orch/ts-quality`; the lock resolves their sibling source trees. A frozen install therefore
-requires those siblings and cannot fall back to registry packages. This is the intended local
-topology.
+This repository needs `node-guardrails` and `ts-quality` checked out next to it; see the catalog
+README for the sibling layout. The lock resolves both as `link:` entries, so a missing sibling fails
+the frozen install instead of falling back to a registry, and `pnpm install` builds
+`node-guardrails` through its `prepare` script.
 
 Tests use fake adapters and loopback fixture servers; they do not call billable provider APIs.
 

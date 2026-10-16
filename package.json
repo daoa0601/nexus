@@ -6,12 +6,6 @@
   "type": "module",
   "packageManager": "pnpm@11.13.1",
   "prettier": "@agentic-orch/ts-quality/prettier",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/daoa0601/nexus.git"
-  },
-  "homepage": "https://github.com/daoa0601/nexus#readme",
-  "bugs": "https://github.com/daoa0601/nexus/issues",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -23,17 +17,6 @@
   "bin": {
     "nexus": "./dist/cli.js"
   },
-  "files": [
-    "dist",
-    "README.md",
-    "ARCHITECTURE.md",
-    "MANAGED_GATEWAYS.md",
-    "QUALITY.md",
-    "SECURITY.md",
-    "LICENSE",
-    "examples/nexus.example.yaml",
-    "scripts/quality/require-pnpm.mjs"
-  ],
   "engines": {
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0",
     "pnpm": "11.13.1"
@@ -48,25 +31,16 @@
     "format": "prettier --write . --ignore-unknown",
     "format:check": "prettier --check . --ignore-unknown",
     "hooks:install": "ts-quality hooks",
-    "lint": "oxlint src tests scripts vitest.config.ts --deny-warnings",
-    "pack:check": "ts-quality pack",
+    "lint": "oxlint src tests vitest.config.ts --deny-warnings",
     "preflight": "pnpm quality",
-    "preinstall": "node scripts/quality/require-pnpm.mjs",
     "quality": "pnpm quality:offline && pnpm deps:check",
-    "quality:offline": "pnpm quality:quick && pnpm test:coverage && pnpm build && pnpm pack:check",
+    "quality:offline": "pnpm quality:quick && pnpm test:coverage && pnpm build",
     "quality:quick": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm secrets:scan",
     "secrets:scan": "ts-quality secrets",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
-  "keywords": [
-    "llm",
-    "openai-compatible",
-    "gateway",
-    "effect",
-    "sse"
-  ],
   "license": "MIT",
   "dependencies": {
     "@agentic-orch/node-guardrails": "workspace:*",

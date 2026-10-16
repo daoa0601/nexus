@@ -21,24 +21,24 @@ sort the eligible providers.
 Nexus remains useful where policy must be local, versioned, or independent of a
 managed catalog:
 
-| Concern                                                                    | Owner in a managed deployment                    |
-| -------------------------------------------------------------------------- | ------------------------------------------------ |
-| Inbound tenant authentication and model allowlists                         | Nexus                                            |
-| Stable public aliases and the accepted request surface                     | Nexus                                            |
-| One root deadline, cancellation, response bounds, and redacted errors      | Nexus                                            |
-| Nexus-to-Vercel authentication with an AI Gateway API key or OIDC token    | Nexus                                            |
-| Routing among providers in the Vercel catalog                              | Vercel AI Gateway                                |
-| Managed provider credentials or explicitly configured provider BYOK        | Vercel AI Gateway                                |
-| Hosted availability routing and spend views                                | Vercel AI Gateway                                |
-| Local Ollama-compatible, private, or other explicitly configured endpoints | Nexus direct targets                             |
-| Deterministic routing among targets explicitly declared equivalent         | Nexus direct targets                             |
-| Durable traces, evaluation evidence, and cross-service correlation         | AgentTrace, after instrumentation is implemented |
+| Concern                                                                    | Owner in a managed deployment         |
+| -------------------------------------------------------------------------- | ------------------------------------- |
+| Inbound tenant authentication and model allowlists                         | Nexus                                 |
+| Stable public aliases and the accepted request surface                     | Nexus                                 |
+| One root deadline, cancellation, response bounds, and redacted errors      | Nexus                                 |
+| Nexus-to-Vercel authentication with an AI Gateway API key or OIDC token    | Nexus                                 |
+| Routing among providers in the Vercel catalog                              | Vercel AI Gateway                     |
+| Managed provider credentials or explicitly configured provider BYOK        | Vercel AI Gateway                     |
+| Hosted availability routing and spend views                                | Vercel AI Gateway                     |
+| Local Ollama-compatible, private, or other explicitly configured endpoints | Nexus direct targets                  |
+| Deterministic routing among targets explicitly declared equivalent         | Nexus direct targets                  |
+| Durable traces, evaluation evidence, and cross-service correlation         | Outside Nexus; see the catalog README |
 
 This design treats Vercel as a catalog-backed upstream. It does not assume that
 arbitrary Nexus or local endpoints can be registered in Vercel's catalog.
 Unsupported, private, and offline targets continue to use Nexus directly.
 
-## One layer owns fan-out
+## Nexus configuration for a managed-gateway alias
 
 A logical request must have exactly one retry/fallback owner. For a future
 Vercel-backed alias:
@@ -47,13 +47,13 @@ Vercel-backed alias:
   exactly one target attempt and never retries or hedges managed-gateway
   requests;
 - let Vercel own provider selection and provider/model fallback inside that
-  dispatch;
-- do not add an application or Observer retry loop around the same call unless
-  the operation is explicitly safe to repeat and the extra billable work is
-  accepted; and
+  dispatch; and
 - keep the Nexus deadline above the complete managed-gateway operation, while
   remembering that cancellation does not guarantee an upstream provider did
   not bill work already started.
+
+Retry ownership for callers above Nexus is cross-repo policy and is recorded in
+the catalog README.
 
 The Nexus attempt ledger would record the dispatch to the configured managed
 gateway target. Any provider attempts performed behind that endpoint are nested
@@ -79,13 +79,14 @@ benchmark manifest must also pin request parameters, prompt and dataset
 digests, code revision, timeout policy, and any provider-visible feature or
 service tier.
 
-## Correlation and AgentTrace
+## Correlation fields
 
-No Nexus-to-AgentTrace exporter exists today. A future integration should emit
-derived spans rather than replace the operational attempt ledger. The same
-logical call should carry:
+No Nexus trace exporter exists today. A future exporter should emit derived
+spans rather than replace the operational attempt ledger. The same logical call
+should carry:
 
-- one externally safe correlation ID across the caller, Nexus, and AgentTrace;
+- one externally safe correlation ID across the caller, Nexus, and the trace
+  backend;
 - separate Nexus attempt IDs and any gateway/provider request identifiers;
 - requested public alias and concrete gateway model;
 - resolved provider and provider API model from gateway metadata;
